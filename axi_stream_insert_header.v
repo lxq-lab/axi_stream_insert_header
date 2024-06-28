@@ -1,7 +1,7 @@
 module axi_stream_insert_header #(
     parameter DATA_WD = 32,
-    parameter DATA_BYTE_WD = 4,
-    parameter BYTE_CNT_WD = 3
+    parameter DATA_BYTE_WD = DATA_WD / 8,
+    parameter BYTE_CNT_WD = $clog2(DATA_BYTE_WD)
 ) (
     input clk,
     input rst_n,
@@ -59,6 +59,14 @@ always @(posedge clk)   begin
         keep_insert_buf <= keep_insert_buf;
         byte_insert_cnt_buf <= byte_insert_cnt_buf;
     end
+end
+
+// 开启一次burst传输的标志
+always @(posedge clk)   begin
+    if(!rst_n)    burst_start <= 0;
+    else if(valid_in && ready_in)   burst_start <= 1;
+    else if(last_out)   burst_start <= 0;
+    else    burst_start <= burst_start;
 end
 
 // AXI Stream data 握手接收 data_in和这个通道的其他数据到buf中。并将head data插入到data_in中，生成有效的data_out
@@ -123,7 +131,6 @@ always  @(posedge clk)   begin
         keep_out <= 0; 
         next_last <= 0;  
         last_keep <= 0;    
-        burst_start <= 0;
     end
     else if(valid_out_buf && ready_out && ~next_last) begin        // data_out_buf中的数据有效，且握手成功
         data_out <=  data_out_buf;
@@ -134,14 +141,12 @@ always  @(posedge clk)   begin
                 next_last <= 0;
                 last_keep <= 0;
                 keep_out <= (keep_insert_buf << 4 - byte_insert_cnt_buf) | (keep_in_buf >> byte_insert_cnt_buf);    //1000 0011 ----> 1110
-                burst_start <= 0;
             end
             else    begin                                   // keep_in = 1100 insert = 0111 ,最后一次传不完，还要传一次
                 last_out <= 0;
                 last_keep <= (keep_in_buf & keep_insert_buf) << 4 - byte_insert_cnt_buf;    // 1110 0011 ----> last_keep = 1000
                 next_last <= 1;
                 keep_out <= 4'b1111; 
-                burst_start <= 1;
             end
         end 
         else    begin                                  
@@ -149,7 +154,6 @@ always  @(posedge clk)   begin
             next_last <= 0;
             last_keep <= 0;
             keep_out <= 4'b1111; 
-            burst_start <= 1;
         end         
     end
     else if(valid_out && ready_out && next_last)    begin      // 一次burst的最后一次传输
@@ -158,7 +162,6 @@ always  @(posedge clk)   begin
         last_out <= 1;
         next_last <= 0;
         keep_out <= last_keep;
-        burst_start <= 0;
     end
     else    begin                       // data通道未握手时输出的data_out和valid_out保持不变
         data_out <= data_out;
@@ -167,7 +170,6 @@ always  @(posedge clk)   begin
         last_keep <= last_keep;
         next_last <= next_last;
         keep_out <= 4'd0;
-        burst_start <= burst_start;  
     end    
 end
 
