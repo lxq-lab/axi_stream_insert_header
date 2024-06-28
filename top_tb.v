@@ -1,5 +1,4 @@
 `timescale 1ns / 1ps
-
 module top_tb(
 
     );
@@ -34,40 +33,93 @@ end
 
 always #5 clk = ~clk;
 
-initial begin
-          data_in = 32'h0;    valid_in = 0;   keep_in = 0;        last_in = 0;    ready_out = 1;
-         
-    // burst´«Êä6¸ödata_inÊı¾İÖ®ºóÀ­µÍvalid_in£¬burstÆÚ¼äÏÂÓÎready_outÒ»Ö±Îª1,ÑéÖ¤burstÎŞÆøÅİ´«Êä
-    #10   data_in = 32'h11111111;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h22222222;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h33333333;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h44444444;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h55555555;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h66666666;    valid_in = 1;   keep_in = 4'b1111;  last_in = 1; ready_out = 1;
-    #10   data_in = 32'h66666666;    valid_in = 0;   keep_in = 4'b0000;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h77777777;    valid_in = 0;   keep_in = 4'b0000;  last_in = 0; ready_out = 1;
-    
-    // burst´«Êä¹ı³ÌÖĞÀ´×ÔÏÂÓÎµÄready_outÀ­µÍÁ½¸öÖÜÆÚÔÙÀ­¸ß£¬½øĞĞ·´Ñ¹ÑéÖ¤
-    #100  data_in = 32'h11111111;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h22222222;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h33333333;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h44444444;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h44444444;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 0;
-    #10   data_in = 32'h44444444;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 0;
-    #10   data_in = 32'h44444444;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h55555555;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h66666666;    valid_in = 1;   keep_in = 4'b1111;  last_in = 0; ready_out = 1;
-    #10   data_in = 32'h77777777;    valid_in = 1;   keep_in = 4'b1100;  last_in = 1; ready_out = 1;
-    #10   data_in = 32'h88888888;    valid_in = 0;   keep_in = 4'b0000;  last_in = 0; ready_out = 1;
-
+always @(posedge clk)   begin
+    if(!rst_n)  data_in <= 0;
+    else if(valid_in && ready_in)   data_in <= {$random}%2**(DATA_WD-1)-1; 
+    else data_in <= data_in;
 end
 
-initial begin
-        valid_insert=0;   data_insert=0;  keep_insert=0;  byte_insert_cnt=0;
-    #10  valid_insert=1;   data_insert=32'hffffff;  keep_insert=4'b0111;  byte_insert_cnt=3'd3;        //head_insertÓëdata_inÍ¬Ê±µ½À´
-    #10  valid_insert=0;   data_insert=32'd0;  keep_insert=4'd0;  byte_insert_cnt=3'd0;  
-    #150 valid_insert=1;   data_insert=32'hffff;  keep_insert=4'b0011;  byte_insert_cnt=3'd2;         // head_insertÔÚdata_inÖ®Ç°µ½À´
-    #10  valid_insert=0;   data_insert=32'd0;  keep_insert=4'd0;  byte_insert_cnt=3'd0;
+always @(posedge clk)   begin
+    if(!rst_n)  data_insert <= {$random}%2**(DATA_WD-1)-1; 
+    else if(valid_insert && ready_insert)   data_insert <= {$random}%2**(DATA_WD-1)-1; 
+    else data_insert <= data_insert;
+end
+
+reg [9:0]count1;
+always @(posedge clk )  begin
+    if(!rst_n)  count1 <= 0; 
+    else if(count1 == 1023)   count1 <= count1; 
+    else count1 <= count1 + 1;
+end
+
+// æµ‹è¯•burstæ— æ°”æ³¡,clk = 16 ---> 22æ—¶ valid_in = 1,ready_out = 1;
+// å‘¨æœŸåœ¨ 100 -- 116æ—¶ æµ‹è¯•åå‹ ready_out æ‹‰é«˜å†æ‹‰ä½å†æ‹‰é«˜
+always @(posedge clk )  begin
+    if(!rst_n)  begin
+            valid_in <= 0; 
+            keep_in <= 0;
+            last_in <= 0;
+            ready_out <= 1;
+    end
+    else if(count1 > 15 &&  count1 < 22)   begin
+            valid_in <= 1; 
+            keep_in <= 4'b1111;
+            last_in <= 0;
+            ready_out <= 1;
+    end
+    else if(count1 == 22)   begin
+            valid_in <= 1;
+            keep_in <= 4'b1100;
+            last_in <= 1;
+            ready_out <= 1;
+    end 
+    else if(count1 > 99 && count1 < 108)    begin
+            keep_in <= 4'b1111;
+            last_in <= 0;
+            if(ready_out)   valid_in <= 1;
+            else            valid_in <= valid_in;
+    end
+    else  if(count1 == 108)begin
+            valid_in <= 1;
+            keep_in <= 4'b1000;
+            last_in <= 1;
+    end
+    else  begin
+            valid_in <= 0;
+            keep_in <= 0;
+            last_in <= 0;
+            ready_out <= 1;
+    end
+end
+
+// clk=104--105  ready_out=0 éªŒè¯åå‹
+always @(posedge clk)   begin
+    if(!rst_n)    ready_out <= 1;
+    else if(count1 > 103 && count1 < 106)   ready_out <= 0;
+    else ready_out <= 1;
+end
+
+always @(posedge clk )  begin
+    if(!rst_n)  begin
+            valid_insert <= 0; 
+            keep_insert <= 0;
+            byte_insert_cnt <= 0;
+    end
+    else if(count1 == 13)   begin        // éªŒè¯head data åœ¨data_inä¹‹å‰åˆ°æ¥
+            valid_insert <= 1; 
+            keep_insert <= 4'b0111;
+            byte_insert_cnt <= 3'd3;
+    end
+    else if(count1 == 100)  begin           // headä¸data_inä¸€èµ·åˆ°æ¥
+            valid_insert <= 1; 
+            keep_insert <= 4'b0011;
+            byte_insert_cnt <= 3'd2;
+    end
+    else    begin
+            valid_insert <= 0; 
+            keep_insert <= 0;
+            byte_insert_cnt <= 0;
+    end
 end
 
 axi_stream_insert_header #(
